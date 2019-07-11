@@ -8,6 +8,8 @@ import java.io.InputStreamReader;
 import java.net.Socket;
 
 import com.tuan.exercise.connection_pool.Log;
+import com.tuan.exercise.connection_pool.MessageIO;
+import com.tuan.exercise.connection_pool.MessageSplitter;
 
 public class ClientApp {
 
@@ -30,19 +32,30 @@ public class ClientApp {
             mNetIn = netIn;
         }
     }
-    
+
     private static class ListeningThread extends Thread {
-        
+
         DataInputStream mNetIn;
-        
+
         public ListeningThread(DataInputStream netIn) {
             mNetIn = netIn;
         }
-        
+
         @Override
         public void run() {
-            while (true) {
-                // listen to server messages
+            try {
+                while (true) {
+                    String resMsg = MessageIO.readMessage(mNetIn);
+                    
+                    MessageSplitter splitter = new MessageSplitter(resMsg);
+                    String cmd = splitter.next();
+                    if ("timeout".equals(cmd)) {
+                        Log.line("YOU TIMEOUT");
+                        break;
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
     }
@@ -52,6 +65,7 @@ public class ClientApp {
         NetworkObject netObj = null;
         BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
 
+        // login and get network object
         while (netObj == null) {
             Log.log("Enter login command: ");
             String loginCmd = stdIn.readLine();
@@ -62,15 +76,14 @@ public class ClientApp {
         // start listening thread
         ListeningThread listeningThread = new ListeningThread(netObj.mNetIn);
         listeningThread.start();
-        
+
         // sending command section
         try {
             DataOutputStream netOut = netObj.mNetOut;
             while (true) {
                 Log.log("Enter command: ");
-                String cmd = stdIn.readLine();
-                netOut.writeLong(cmd.getBytes().length);
-                netOut.write(cmd.getBytes());
+                String cmdMsg = stdIn.readLine();
+                MessageIO.sendMessage(netOut, cmdMsg);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -82,23 +95,32 @@ public class ClientApp {
         String[] parts = loginCmd.split(" ");
 
         if ("login".equals(parts[0])) {
-            Socket socket;
             try {
-                socket = new Socket(HOST_NAME, SERVER_PORT);
+                Socket socket = new Socket(HOST_NAME, SERVER_PORT);
                 DataOutputStream netOut = new DataOutputStream(socket.getOutputStream());
                 DataInputStream netIn = new DataInputStream(socket.getInputStream());
 
-                // send cmd length
-                
-                // send cmd message
-                
-                // receive login response
-                
+                // send login command
+                MessageIO.sendMessage(netOut, loginCmd);
+
+                // read login command
+                String loginRes = MessageIO.readMessage(netIn);
+                MessageSplitter splitter = new MessageSplitter(loginRes);
+
                 // check login status
-                
-                // create NetworkObject if login ok
+                String cmd = splitter.next();
+                String loginStat = splitter.next();
+                if ("success".equals(loginStat)) {
+                    Log.line("Login Success");
+                    netObj = new NetworkObject(socket, netOut, netIn);
+                } else {
+                    Log.line("Failed to login");
+                    netOut.close();
+                    netIn.close();
+                    socket.close();
+                }
             } catch (IOException e) {
-                // print corresponding error
+                e.printStackTrace();
             }
         }
 

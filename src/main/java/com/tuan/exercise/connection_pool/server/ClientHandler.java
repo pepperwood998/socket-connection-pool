@@ -7,6 +7,8 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 
 import com.tuan.exercise.connection_pool.Log;
+import com.tuan.exercise.connection_pool.MessageIO;
+import com.tuan.exercise.connection_pool.MessageSplitter;
 
 // Each client talk to server in a separated thread
 public class ClientHandler extends Thread {
@@ -17,8 +19,6 @@ public class ClientHandler extends Thread {
 
     private boolean mAvailable;
 
-    private Thread readChannel;
-
     public ClientHandler(Socket socket, String clientName) {
         super(clientName);
         mSocket = socket;
@@ -28,63 +28,55 @@ public class ClientHandler extends Thread {
     public void run() {
         mAvailable = true;
 
-        final int MSG_BUFFER = 1024;
-        byte[] msgBuffer = new byte[MSG_BUFFER];
         try {
             mSocket.setSoTimeout(1000 * 2);
             mNetOut = new DataOutputStream(mSocket.getOutputStream());
             mNetIn = new DataInputStream(mSocket.getInputStream());
 
             while (true) {
-                long dataSize = mNetIn.readLong();
-                // read message data
-                int bytesRead = 0;
-                long totalRead = 0L;
-                StringBuilder msgData = new StringBuilder();
-                while ((bytesRead = mNetIn.read(msgBuffer)) > 0) {
-                    String msgPart = new String(msgBuffer, 0, bytesRead);
-                    msgData.append(msgPart);
+                String msgData = MessageIO.readMessage(mNetIn);
+                Log.line(msgData);
 
-                    totalRead += bytesRead;
-                    if (totalRead >= dataSize)
-                        break;
-                }
-                Log.line(msgData.toString());
-
-                String[] parts = msgData.toString().split(" ");
-                String cmd = parts[0];
+                MessageSplitter splitter = new MessageSplitter(msgData);
+                String cmd = splitter.next();
                 if ("login".equals(cmd)) {
-                    boolean failed = doLogin(parts[1], parts[2]);
-                    if (failed)
+                    boolean success = doLogin(splitter.next(), splitter.next());
+                    if (!success) {
+                        MessageIO.sendMessage(mNetOut, "login failed");
                         break;
+                    }
 
-                    Log.line("A client logged in");
+                    Log.line(getName() + " logged in");
+                    MessageIO.sendMessage(mNetOut, "login success");
+
                 } else if ("msg".equals(cmd)) {
+                    Log.line(">>>" + getName() + ":" + splitter.next());
 
                 } else if ("quit".equals(cmd)) {
                     break;
                 }
             }
         } catch (SocketTimeoutException e) {
-            Log.error("Client killed due to no active action", e, false);
+            try {
+                MessageIO.sendMessage(mNetOut, "timeout");
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
+            Log.error("TIMEOUT, NO ACTION", e, false);
         } catch (IOException e) {
             Log.error("Client stream closed", e, false);
         } finally {
             clean();
         }
-
-        if (readChannel != null) {
-            readChannel.start();
-        }
     }
 
     private boolean doLogin(String uname, String pwd) {
-        boolean failed = true;
+        boolean success = false;
 
         if ("abc".equals(uname) && "123".equals(pwd))
-            failed = false;
+            success = true;
 
-        return failed;
+        return success;
     }
 
     public boolean isAvailable() {
