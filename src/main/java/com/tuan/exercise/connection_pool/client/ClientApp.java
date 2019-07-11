@@ -46,7 +46,7 @@ public class ClientApp {
             try {
                 while (true) {
                     String resMsg = MessageIO.readMessage(mNetIn);
-                    
+
                     MessageSplitter splitter = new MessageSplitter(resMsg);
                     String cmd = splitter.next();
                     if ("timeout".equals(cmd)) {
@@ -86,7 +86,7 @@ public class ClientApp {
                 MessageIO.sendMessage(netOut, cmdMsg);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.error("Network stream closed", e, false);
         }
     }
 
@@ -108,7 +108,7 @@ public class ClientApp {
                 MessageSplitter splitter = new MessageSplitter(loginRes);
 
                 // check login status
-                String cmd = splitter.next();
+                splitter.skip(1);
                 String loginStat = splitter.next();
                 if ("success".equals(loginStat)) {
                     Log.line("Login Success");

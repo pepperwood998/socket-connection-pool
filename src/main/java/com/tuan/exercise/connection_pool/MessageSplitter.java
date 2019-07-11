@@ -17,4 +17,10 @@ public class MessageSplitter {
     public String next() {
         return it.next();
     }
+
+    public void skip(int step) {
+        while (step-- > 0) {
+            it.next();
+        }
+    }
 }
