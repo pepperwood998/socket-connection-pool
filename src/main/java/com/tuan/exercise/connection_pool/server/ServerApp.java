@@ -5,13 +5,11 @@ import java.util.HashSet;
 import java.util.Set;
 
 import com.tuan.exercise.connection_pool.Log;
-import com.tuan.exercise.connection_pool.SampleDatabase;
 
 public class ServerApp {
 
     private static final int PORT;
     private static Set<ClientHandler> mHandlers;
-    public static SampleDatabase db ;
     static {
         PORT = 6969;
         mHandlers = new HashSet<>();
@@ -19,10 +17,9 @@ public class ServerApp {
 
     public static void main(String[] args) throws IOException {
         Log.line("--- SERVER ---");
-        db = new SampleDatabase();
         ConnectionThread conThread = new ConnectionThread(PORT, mHandlers);
         CleanUpThread cleanUpThread = new CleanUpThread(mHandlers);
-        
+
         conThread.start();
         cleanUpThread.start();
     }
