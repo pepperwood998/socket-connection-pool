@@ -59,6 +59,7 @@ public class ClientHandler extends Thread {
                     Log.line(">>>" + getName() + ":" + message);
                     MessageIO.sendMessage(mNetOut, "msglen " + message.length());
                 } else if ("quit".equals(cmd)) {
+                    MessageIO.sendMessage(mNetOut, "quit ok");
                     break;
                 }
             }
