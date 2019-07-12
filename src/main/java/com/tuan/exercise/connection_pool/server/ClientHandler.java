@@ -53,6 +53,7 @@ public class ClientHandler extends Thread {
                     Log.line(">>>" + getName() + ":" + splitter.next());
 
                 } else if ("quit".equals(cmd)) {
+                    MessageIO.sendMessage(mNetOut, "quit ok");
                     break;
                 }
             }

@@ -52,10 +52,13 @@ public class ClientApp {
                     if ("timeout".equals(cmd)) {
                         Log.line("YOU TIMEOUT");
                         break;
+                    } else if ("quit".equals(cmd)) {
+                        Log.line("QUIT " + splitter.next());
+                        break;
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.error("Network stream closed", e, false);
             }
         }
     }
@@ -84,6 +87,8 @@ public class ClientApp {
                 Log.log("Enter command: ");
                 String cmdMsg = stdIn.readLine();
                 MessageIO.sendMessage(netOut, cmdMsg);
+                if ("quit".equals(cmdMsg))
+                    break;
             }
         } catch (IOException e) {
             Log.error("Network stream closed", e, false);
@@ -108,19 +113,20 @@ public class ClientApp {
                 MessageSplitter splitter = new MessageSplitter(loginRes);
 
                 // check login status
-                splitter.skip(1);
-                String loginStat = splitter.next();
-                if ("success".equals(loginStat)) {
-                    Log.line("Login Success");
-                    netObj = new NetworkObject(socket, netOut, netIn);
-                } else {
-                    Log.line("Failed to login");
-                    netOut.close();
-                    netIn.close();
-                    socket.close();
+                String cmd = splitter.next();
+                if ("ddos".equals(cmd)) {
+                    Log.line(splitter.next());
+                } else if ("login".equals(cmd)) {
+                    String loginStat = splitter.next();
+                    if ("success".equals(loginStat)) {
+                        Log.line("Login Success");
+                        netObj = new NetworkObject(socket, netOut, netIn);
+                    } else {
+                        Log.line("Failed to login");
+                    }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.error("Network stream closed", e, false);
             }
         }
 
