@@ -10,7 +10,7 @@ public class ServerApp {
         Log.line("--- SERVER ---");
         CoreSystem conThread = new CoreSystem();
 
-        Thread.sleep(5000);
-        conThread.shutdown();
+//        Thread.sleep(5000);
+//        conThread.shutdown();
     }
 }
