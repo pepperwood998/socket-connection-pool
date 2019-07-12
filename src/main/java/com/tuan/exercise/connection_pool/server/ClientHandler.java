@@ -6,10 +6,10 @@ import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 
+import com.tuan.exercise.connection_pool.Constant;
 import com.tuan.exercise.connection_pool.Log;
 import com.tuan.exercise.connection_pool.MessageIO;
 import com.tuan.exercise.connection_pool.MessageSplitter;
-import com.tuan.exercise.connection_pool.SampleDatabase;
 
 // Each client talk to server in a separated thread
 public class ClientHandler extends Thread {
@@ -30,7 +30,7 @@ public class ClientHandler extends Thread {
         mAvailable = true;
 
         try {
-            mSocket.setSoTimeout(1000 * 20);
+            mSocket.setSoTimeout(Constant.NO_ACTION_TIMEOUT);
             mNetOut = new DataOutputStream(mSocket.getOutputStream());
             mNetIn = new DataInputStream(mSocket.getInputStream());
 
@@ -73,6 +73,7 @@ public class ClientHandler extends Thread {
         } catch (IOException e) {
             Log.error("Client stream closed", e, false);
         } finally {
+            Log.line(getName() + " disconnected");
             clean();
         }
     }

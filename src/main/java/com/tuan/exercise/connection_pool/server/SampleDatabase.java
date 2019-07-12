@@ -1,4 +1,4 @@
-package com.tuan.exercise.connection_pool;
+package com.tuan.exercise.connection_pool.server;
 
 import java.util.Hashtable;
 

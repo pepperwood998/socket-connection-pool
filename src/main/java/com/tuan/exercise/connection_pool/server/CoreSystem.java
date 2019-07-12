@@ -4,22 +4,27 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
 
+import com.tuan.exercise.connection_pool.Constant;
 import com.tuan.exercise.connection_pool.Log;
 import com.tuan.exercise.connection_pool.MessageIO;
 
-public class ConnectionThread extends Thread {
+public class CoreSystem extends Thread {
 
-    private static final int MAX_POOL_SIZE = 1;
     private static Set<ClientHandler> mHandlers;
     private static ServerSocket mServer;
     private boolean mActive;
 
-    public ConnectionThread(int port, Set<ClientHandler> handlers) throws IOException {
-        mServer = new ServerSocket(port);
-        mHandlers = handlers;
+    public CoreSystem() throws IOException {
+        mServer = new ServerSocket(Constant.SERVER_CONN_PORT);
+        mHandlers = new HashSet<>();
         mActive = true;
+
+        CleanUpThread cleanUpThread = new CleanUpThread();
+        cleanUpThread.start();
     }
 
     @Override
@@ -33,11 +38,9 @@ public class ConnectionThread extends Thread {
 
                 synchronized (mHandlers) {
                     // if server capacity is full
-                    if (mHandlers.size() >= MAX_POOL_SIZE) {
+                    if (mHandlers.size() >= Constant.MAX_POOL_SIZE) {
                         DataOutputStream netOut = new DataOutputStream(socket.getOutputStream());
                         MessageIO.sendMessage(netOut, "ddos SERVER_FULL");
-//                        netOut.close();
-//                        socket.close();
                         continue;
                     }
                 }
@@ -56,6 +59,28 @@ public class ConnectionThread extends Thread {
 
             } catch (IOException e) {
                 Log.error("Failed to initiate socket", e, false);
+            }
+        }
+    }
+
+    private class CleanUpThread extends Thread {
+
+        @Override
+        public void run() {
+            while (true) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                synchronized (mHandlers) {
+                    for (Iterator<ClientHandler> it = mHandlers.iterator(); it.hasNext();) {
+                        ClientHandler handler = it.next();
+                        if (!handler.isAvailable()) {
+                            it.remove();
+                        }
+                    }
+                }
             }
         }
     }
