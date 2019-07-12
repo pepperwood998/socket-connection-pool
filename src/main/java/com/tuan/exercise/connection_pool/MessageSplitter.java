@@ -22,7 +22,11 @@ public class MessageSplitter {
 
     public void skip(int step) {
         while (step-- > 0) {
-            it.next();
+            String word = this.next();
+            if (word == null) {
+                Log.line("End of Splitter");
+                break;
+            }
         }
     }
 }
