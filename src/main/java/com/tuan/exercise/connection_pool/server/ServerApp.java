@@ -6,9 +6,11 @@ import com.tuan.exercise.connection_pool.Log;
 
 public class ServerApp {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         Log.line("--- SERVER ---");
         CoreSystem conThread = new CoreSystem();
-        conThread.start();
+
+        Thread.sleep(5000);
+        conThread.shutdown();
     }
 }
