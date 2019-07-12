@@ -15,7 +15,9 @@ public class MessageSplitter {
     }
 
     public String next() {
-        return it.next();
+        if (it.hasNext())
+            return it.next();
+        else return null;
     }
 
     public void skip(int step) {

@@ -52,6 +52,8 @@ public class ClientApp {
                     if ("timeout".equals(cmd)) {
                         Log.line("YOU TIMEOUT");
                         break;
+                    } else if ("msglen".equals(cmd)) {
+                        Log.line(splitter.next());
                     }
                 }
             } catch (IOException e) {

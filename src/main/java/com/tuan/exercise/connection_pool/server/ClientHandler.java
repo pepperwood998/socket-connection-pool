@@ -29,7 +29,7 @@ public class ClientHandler extends Thread {
         mAvailable = true;
 
         try {
-            mSocket.setSoTimeout(1000 * 2);
+            mSocket.setSoTimeout(1000 * 20);
             mNetOut = new DataOutputStream(mSocket.getOutputStream());
             mNetIn = new DataInputStream(mSocket.getInputStream());
 
@@ -50,8 +50,14 @@ public class ClientHandler extends Thread {
                     MessageIO.sendMessage(mNetOut, "login success");
 
                 } else if ("msg".equals(cmd)) {
-                    Log.line(">>>" + getName() + ":" + splitter.next());
-
+                    StringBuilder sentence = new StringBuilder();
+                    String word;
+                    while ((word = splitter.next()) != null)
+                        sentence.append(word)
+                                .append(" ");
+                    String message = sentence.toString().trim();
+                    Log.line(">>>" + getName() + ":" + message);
+                    MessageIO.sendMessage(mNetOut, "msglen " + message.length());
                 } else if ("quit".equals(cmd)) {
                     break;
                 }
