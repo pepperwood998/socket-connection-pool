@@ -7,19 +7,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
 
+import com.tuan.exercise.connection_pool.Constant;
 import com.tuan.exercise.connection_pool.Log;
 import com.tuan.exercise.connection_pool.MessageIO;
 import com.tuan.exercise.connection_pool.MessageSplitter;
 
 public class ClientApp {
-
-    private static final String HOST_NAME;
-    private static final int SERVER_PORT;
-
-    static {
-        HOST_NAME = "localhost";
-        SERVER_PORT = 6969;
-    }
+    private static NetworkObject mNetObj = null;
 
     private static class NetworkObject {
         Socket mSocket;
@@ -33,57 +27,31 @@ public class ClientApp {
         }
     }
 
-    private static class ListeningThread extends Thread {
-
-        DataInputStream mNetIn;
-
-        public ListeningThread(DataInputStream netIn) {
-            mNetIn = netIn;
-        }
-
-        @Override
-        public void run() {
-            try {
-                while (true) {
-                    String resMsg = MessageIO.readMessage(mNetIn);
-
-                    MessageSplitter splitter = new MessageSplitter(resMsg);
-                    String cmd = splitter.next();
-                    if ("timeout".equals(cmd)) {
-                        Log.line("YOU TIMEOUT");
-                        break;
-                    }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
     public static void main(String[] args) throws IOException {
 
-        NetworkObject netObj = null;
         BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
 
         // login and get network object
-        while (netObj == null) {
+        while (mNetObj == null) {
             Log.log("Enter login command: ");
             String loginCmd = stdIn.readLine();
 
-            netObj = clientLogin(loginCmd);
+            mNetObj = clientLogin(loginCmd);
         }
 
         // start listening thread
-        ListeningThread listeningThread = new ListeningThread(netObj.mNetIn);
+        ListeningThread listeningThread = new ListeningThread();
         listeningThread.start();
 
         // sending command section
         try {
-            DataOutputStream netOut = netObj.mNetOut;
+            DataOutputStream netOut = mNetObj.mNetOut;
             while (true) {
                 Log.log("Enter command: ");
                 String cmdMsg = stdIn.readLine();
                 MessageIO.sendMessage(netOut, cmdMsg);
+                if ("quit".equals(cmdMsg))
+                    break;
             }
         } catch (IOException e) {
             Log.error("Network stream closed", e, false);
@@ -96,7 +64,7 @@ public class ClientApp {
 
         if ("login".equals(parts[0])) {
             try {
-                Socket socket = new Socket(HOST_NAME, SERVER_PORT);
+                Socket socket = new Socket(Constant.HOST_NAME, Constant.SERVER_CONN_PORT);
                 DataOutputStream netOut = new DataOutputStream(socket.getOutputStream());
                 DataInputStream netIn = new DataInputStream(socket.getInputStream());
 
@@ -108,22 +76,61 @@ public class ClientApp {
                 MessageSplitter splitter = new MessageSplitter(loginRes);
 
                 // check login status
-                splitter.skip(1);
-                String loginStat = splitter.next();
-                if ("success".equals(loginStat)) {
-                    Log.line("Login Success");
-                    netObj = new NetworkObject(socket, netOut, netIn);
-                } else {
-                    Log.line("Failed to login");
-                    netOut.close();
-                    netIn.close();
+                String cmd = splitter.next();
+                if ("ddos".equals(cmd)) {
+                    Log.line(splitter.next());
+                } else if ("login".equals(cmd)) {
+                    String loginStat = splitter.next();
+                    if ("success".equals(loginStat)) {
+                        Log.line("Login Success");
+                        netObj = new NetworkObject(socket, netOut, netIn);
+                    } else {
+                        Log.line("Failed to login");
+                    }
+                }
+
+                if (netObj == null) {
                     socket.close();
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.error("Network stream closed", e, false);
             }
         }
 
         return netObj;
+    }
+
+    private static class ListeningThread extends Thread {
+
+        @Override
+        public void run() {
+            DataInputStream netIn = mNetObj.mNetIn;
+
+            try {
+                while (true) {
+                    String resMsg = MessageIO.readMessage(netIn);
+
+                    MessageSplitter splitter = new MessageSplitter(resMsg);
+                    String cmd = splitter.next();
+                    if ("timeout".equals(cmd)) {
+                        Log.line("YOU TIMEOUT");
+                        break;
+                    } else if ("quit".equals(cmd)) {
+                        Log.line("QUIT " + splitter.next());
+                        break;
+                    } else if ("msglen".equals(cmd)) {
+                        Log.line(splitter.next());
+                    }
+                }
+            } catch (IOException e) {
+                Log.error("Network stream closed", e, false);
+            } finally {
+                try {
+                    mNetObj.mSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 }

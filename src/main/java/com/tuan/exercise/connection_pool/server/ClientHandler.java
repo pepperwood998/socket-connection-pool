@@ -4,7 +4,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
-import java.net.SocketTimeoutException;
 
 import com.tuan.exercise.connection_pool.Log;
 import com.tuan.exercise.connection_pool.MessageIO;
@@ -18,29 +17,33 @@ public class ClientHandler extends Thread {
     private DataInputStream mNetIn;
 
     private boolean mAvailable;
+    private long mLastIOTime;
+    private String mUsername;
 
     public ClientHandler(Socket socket, String clientName) {
         super(clientName);
         mSocket = socket;
+        mUsername = null;
     }
 
     @Override
     public void run() {
         mAvailable = true;
+        mLastIOTime = System.currentTimeMillis();
 
         try {
-            mSocket.setSoTimeout(1000 * 2);
             mNetOut = new DataOutputStream(mSocket.getOutputStream());
             mNetIn = new DataInputStream(mSocket.getInputStream());
 
             while (true) {
                 String msgData = MessageIO.readMessage(mNetIn);
-                Log.line(msgData);
+                mLastIOTime = System.currentTimeMillis();
 
                 MessageSplitter splitter = new MessageSplitter(msgData);
                 String cmd = splitter.next();
                 if ("login".equals(cmd)) {
-                    boolean success = doLogin(splitter.next(), splitter.next());
+                    mUsername = splitter.next();
+                    boolean success = doLogin(mUsername, splitter.next());
                     if (!success) {
                         MessageIO.sendMessage(mNetOut, "login failed");
                         break;
@@ -50,37 +53,56 @@ public class ClientHandler extends Thread {
                     MessageIO.sendMessage(mNetOut, "login success");
 
                 } else if ("msg".equals(cmd)) {
-                    Log.line(">>>" + getName() + ":" + splitter.next());
-
+                    StringBuilder sentence = new StringBuilder();
+                    String word;
+                    while ((word = splitter.next()) != null)
+                        sentence.append(word).append(" ");
+                    String message = sentence.toString().trim();
+                    Log.line(">>>" + getName() + ":" + message);
+                    MessageIO.sendMessage(mNetOut, "msglen " + message.length());
                 } else if ("quit".equals(cmd)) {
+                    MessageIO.sendMessage(mNetOut, "quit ok");
                     break;
                 }
             }
-        } catch (SocketTimeoutException e) {
-            try {
-                MessageIO.sendMessage(mNetOut, "timeout");
-            } catch (IOException e1) {
-                e1.printStackTrace();
-            }
-            Log.error("TIMEOUT, NO ACTION", e, false);
         } catch (IOException e) {
             Log.error("Client stream closed", e, false);
         } finally {
+            Log.line(getName() + " disconnected");
             clean();
         }
     }
 
     private boolean doLogin(String uname, String pwd) {
         boolean success = false;
-
-        if ("abc".equals(uname) && "123".equals(pwd))
+        if (SampleDatabase.checkAuthentication(uname, pwd))
             success = true;
-
         return success;
+    }
+
+    public void responseTimeOut() {
+        try {
+            MessageIO.sendMessage(mNetOut, "timeout");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        Log.line("TIMEOUT, NO ACTION");
     }
 
     public boolean isAvailable() {
         return mAvailable;
+    }
+
+    public long getLastIOTime() {
+        return mLastIOTime;
+    }
+
+    public String getUsername() {
+        return mUsername;
+    }
+
+    public Socket getSocket() {
+        return mSocket;
     }
 
     public void clean() {
