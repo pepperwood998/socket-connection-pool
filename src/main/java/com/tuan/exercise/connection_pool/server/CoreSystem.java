@@ -1,5 +1,6 @@
 package com.tuan.exercise.connection_pool.server;
 
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -13,6 +14,7 @@ import java.util.Set;
 import com.tuan.exercise.connection_pool.Constant;
 import com.tuan.exercise.connection_pool.Log;
 import com.tuan.exercise.connection_pool.MessageIO;
+import com.tuan.exercise.connection_pool.MessageSplitter;
 
 public class CoreSystem implements ICore {
 
@@ -85,6 +87,13 @@ public class CoreSystem implements ICore {
         mCleanUpActive = false;
     }
 
+    private boolean doLogin(String uname, String pwd) {
+        boolean success = false;
+        if (SampleDatabase.checkAuthentication(uname, pwd))
+            success = true;
+        return success;
+    }
+
     private class ConnectionThread extends Thread {
 
         @Override
@@ -96,26 +105,38 @@ public class CoreSystem implements ICore {
                     Socket socket;
                     socket = mServer.accept();
 
+                    DataInputStream netIn = new DataInputStream(socket.getInputStream());
+                    DataOutputStream netOut = new DataOutputStream(socket.getOutputStream());
                     synchronized (mHandlers) {
                         // if server capacity is full
                         if (mHandlers.size() >= Constant.MAX_POOL_SIZE) {
-                            DataOutputStream netOut = new DataOutputStream(socket.getOutputStream());
                             MessageIO.sendMessage(netOut, "ddos SERVER_FULL");
                             continue;
                         }
                     }
 
-                    // create handling thread for each client
-                    String clientName = "Client-" + mHandlers.size();
-                    ClientHandler clientHandler = new ClientHandler(socket, clientName);
+                    // get login data
+                    String username = "";
+                    MessageSplitter splitter = new MessageSplitter(MessageIO.readMessage(netIn));
+                    if ("login".equals(splitter.next())) {
+                        username = splitter.next();
+                        boolean success = doLogin(username, splitter.next());
+                        if (!success) {
+                            Log.line("A Client failed to login");
+                            MessageIO.sendMessage(netOut, "login failed");
+                            continue;
+                        }
+                        MessageIO.sendMessage(netOut, "login success");
+                    }
 
-                    // save the client to a collection
+                    // create handling thread for each client
+                    ClientHandler clientHandler = new ClientHandler(socket, username);
                     synchronized (mHandlers) {
                         mHandlers.add(clientHandler);
                     }
                     clientHandler.start();
 
-                    Log.line(clientName + " connected and established");
+                    Log.line(username + " connected and established");
 
                 } catch (IOException e) {
                     Log.error("Failed to initiate socket or server closed", e, false);

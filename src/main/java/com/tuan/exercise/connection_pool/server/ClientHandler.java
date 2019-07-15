@@ -41,18 +41,7 @@ public class ClientHandler extends Thread {
 
                 MessageSplitter splitter = new MessageSplitter(msgData);
                 String cmd = splitter.next();
-                if ("login".equals(cmd)) {
-                    mUsername = splitter.next();
-                    boolean success = doLogin(mUsername, splitter.next());
-                    if (!success) {
-                        MessageIO.sendMessage(mNetOut, "login failed");
-                        break;
-                    }
-
-                    Log.line(getName() + " logged in");
-                    MessageIO.sendMessage(mNetOut, "login success");
-
-                } else if ("msg".equals(cmd)) {
+                if ("msg".equals(cmd)) {
                     StringBuilder sentence = new StringBuilder();
                     String word;
                     while ((word = splitter.next()) != null)
@@ -71,13 +60,6 @@ public class ClientHandler extends Thread {
             Log.line(getName() + " disconnected");
             clean();
         }
-    }
-
-    private boolean doLogin(String uname, String pwd) {
-        boolean success = false;
-        if (SampleDatabase.checkAuthentication(uname, pwd))
-            success = true;
-        return success;
     }
 
     public void responseTimeOut() {
